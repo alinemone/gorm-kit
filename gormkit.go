@@ -26,6 +26,7 @@ type Config struct {
 	MaxOpenConns    int
 	MaxIdleConns    int
 	ConnMaxLifetime time.Duration
+	ConnMaxIdleTime time.Duration
 
 	LogLevel       string
 	AutoMigrate    bool
@@ -52,6 +53,9 @@ func New(cfg *Config) (*Manager, error) {
 	}
 	if cfg.ConnMaxLifetime == 0 {
 		cfg.ConnMaxLifetime = 5 * time.Minute
+	}
+	if cfg.ConnMaxIdleTime == 0 {
+		cfg.ConnMaxIdleTime = 5 * time.Minute
 	}
 	if cfg.RetryAttempts == 0 {
 		cfg.RetryAttempts = 3
@@ -131,6 +135,7 @@ func (m *Manager) connect() error {
 	m.sqlDB.SetMaxOpenConns(m.config.MaxOpenConns)
 	m.sqlDB.SetMaxIdleConns(m.config.MaxIdleConns)
 	m.sqlDB.SetConnMaxLifetime(m.config.ConnMaxLifetime)
+	m.sqlDB.SetConnMaxIdleTime(m.config.ConnMaxIdleTime)
 
 	ctx, cancel := context.WithTimeout(context.Background(), m.config.ConnectTimeout)
 	defer cancel()
