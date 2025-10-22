@@ -182,15 +182,15 @@ func (m *Manager) Close() error {
 	return nil
 }
 
-func Paginate(page, limit int) func(db *gorm.DB) *gorm.DB {
+func Paginate(page, perPage int) func(db *gorm.DB) *gorm.DB {
 	return func(db *gorm.DB) *gorm.DB {
 		if page < 1 {
 			page = 1
 		}
-		if limit < 1 {
-			limit = 10
+		if perPage < 1 {
+			perPage = 10
 		}
-		offset := (page - 1) * limit
-		return db.Offset(offset).Limit(limit)
+		offset := (page - 1) * perPage
+		return db.Offset(offset).Limit(perPage)
 	}
 }

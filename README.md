@@ -95,7 +95,7 @@ err := manager.Transaction(ctx, func(tx *gorm.DB) error {
 })
 
 // Pagination
-db.Scopes(gormkit.Paginate(page, limit)).Find(&users)
+db.Scopes(gormkit.Paginate(page, perPage)).Find(&users)
 
 // Migrate
 manager.Migrate(&User{}, &Product{})
@@ -122,37 +122,40 @@ import (
 var db *gormkit.Manager
 
 func main() {
-    var err error
-    db, err = gormkit.New(&gormkit.Config{
-        Driver:   "postgres",
-        Host:     "localhost",
-        Port:     5432,
-        Database: "myapp",
-    })
-    if err != nil {
-        panic(err)
-    }
-    defer db.Close()
+	var err error
+	db, err = gormkit.New(&gormkit.Config{
+		Driver:   "postgres",
+		Host:     "localhost",
+		User:     "postgres",
+		Password: "your-password",
+		Port:     5432,
+		Database: "myapp",
+	})
+	if err != nil {
+		panic(err)
+	}
+	defer db.Close()
 
-    app := fiber.New()
-    
-    app.Get("/users", func(c *fiber.Ctx) error {
-        var users []User
-        db.WithContext(c.Context()).Find(&users)
-        return c.JSON(users)
-    })
+	app := fiber.New()
 
-    app.Listen(":8080")
+	app.Get("/users", func(c *fiber.Ctx) error {
+		var users []User
+		db.WithContext(c.Context()).Find(&users)
+		return c.JSON(users)
+	})
+
+	app.Listen(":8080")
 }
+
 ```
 
 ### Pagination
 
 ```go
-func ListUsers(ctx context.Context, page, limit int) ([]User, error) {
+func ListUsers(ctx context.Context, page, perPage int) ([]User, error) {
     var users []User
     err := manager.WithContext(ctx).
-        Scopes(gormkit.Paginate(page, limit)).
+        Scopes(gormkit.Paginate(page, perPage)).
         Find(&users).Error
     return users, err
 }
