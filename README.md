@@ -5,7 +5,7 @@ A simple, reusable GORM manager for Go projects.
 ## Installation
 
 ```bash
-go get github.com/alinemone/gorm-kit
+go get github.com/alinemone/gorm-kit@latest
 ```
 
 ## Quick Start
