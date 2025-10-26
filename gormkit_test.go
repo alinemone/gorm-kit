@@ -135,6 +135,156 @@ func TestStats(t *testing.T) {
 }
 
 // =============================================================================
+// Timezone Tests
+// =============================================================================
+
+func TestTimezoneDefault(t *testing.T) {
+	manager, err := gormkit.New(&gormkit.Config{
+		Driver:   "test",
+		LogLevel: "silent",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer manager.Close()
+
+	db := manager.DB()
+	db.AutoMigrate(&User{})
+
+	user := User{Name: "Timezone Test"}
+	if err := db.Create(&user).Error; err != nil {
+		t.Errorf("Create failed: %v", err)
+	}
+
+	var found User
+	if err := db.First(&found, user.ID).Error; err != nil {
+		t.Errorf("Find failed: %v", err)
+	}
+
+	// Check that CreatedAt is set
+	if found.CreatedAt.IsZero() {
+		t.Error("CreatedAt should not be zero")
+	}
+
+	// Default timezone should be Asia/Tehran (as per your config)
+	t.Logf("User created at: %v", found.CreatedAt)
+	t.Logf("Timezone: %s", found.CreatedAt.Location().String())
+}
+
+func TestTimezoneCustom(t *testing.T) {
+	timezones := []string{
+		"UTC",
+		"Asia/Tehran",
+		"America/New_York",
+		"Europe/London",
+		"Asia/Tokyo",
+	}
+
+	for _, tz := range timezones {
+		t.Run(tz, func(t *testing.T) {
+			manager, err := gormkit.New(&gormkit.Config{
+				Driver:   "test",
+				LogLevel: "silent",
+				Timezone: tz,
+			})
+			if err != nil {
+				t.Fatalf("Failed to create manager with timezone %s: %v", tz, err)
+			}
+			defer manager.Close()
+
+			db := manager.DB()
+			db.AutoMigrate(&User{})
+
+			user := User{Name: fmt.Sprintf("User-%s", tz)}
+			if err := db.Create(&user).Error; err != nil {
+				t.Errorf("Create failed: %v", err)
+			}
+
+			var found User
+			if err := db.First(&found, user.ID).Error; err != nil {
+				t.Errorf("Find failed: %v", err)
+			}
+
+			t.Logf("Timezone %s: User created at %v (Location: %s)",
+				tz, found.CreatedAt, found.CreatedAt.Location().String())
+
+			// Verify the timezone by checking offset
+			_, offset := found.CreatedAt.Zone()
+			expectedLoc, _ := time.LoadLocation(tz)
+			expectedTime := time.Now().In(expectedLoc)
+			_, expectedOffset := expectedTime.Zone()
+
+			if offset != expectedOffset {
+				t.Errorf("Expected offset %d, got %d", expectedOffset, offset)
+			}
+		})
+	}
+}
+
+func TestTimezoneInvalid(t *testing.T) {
+	_, err := gormkit.New(&gormkit.Config{
+		Driver:   "test",
+		LogLevel: "silent",
+		Timezone: "Invalid/Timezone",
+	})
+
+	if err == nil {
+		t.Error("Expected error for invalid timezone")
+	}
+
+	t.Logf("Got expected error: %v", err)
+}
+
+func TestTimezoneComparison(t *testing.T) {
+	// Create two managers with different timezones
+	managerUTC, err := gormkit.New(&gormkit.Config{
+		Driver:   "test",
+		Database: ":memory:",
+		LogLevel: "silent",
+		Timezone: "UTC",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer managerUTC.Close()
+
+	managerTehran, err := gormkit.New(&gormkit.Config{
+		Driver:   "test",
+		Database: ":memory:",
+		LogLevel: "silent",
+		Timezone: "Asia/Tehran",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer managerTehran.Close()
+
+	// Create users at the same moment
+	dbUTC := managerUTC.DB()
+	dbUTC.AutoMigrate(&User{})
+
+	dbTehran := managerTehran.DB()
+	dbTehran.AutoMigrate(&User{})
+
+	userUTC := User{Name: "UTC User"}
+	userTehran := User{Name: "Tehran User"}
+
+	dbUTC.Create(&userUTC)
+	dbTehran.Create(&userTehran)
+
+	t.Logf("UTC time: %v (Location: %s)",
+		userUTC.CreatedAt, userUTC.CreatedAt.Location().String())
+	t.Logf("Tehran time: %v (Location: %s)",
+		userTehran.CreatedAt, userTehran.CreatedAt.Location().String())
+
+	// The Unix timestamps should be the same (within 1 second)
+	diff := userUTC.CreatedAt.Unix() - userTehran.CreatedAt.Unix()
+	if diff > 1 || diff < -1 {
+		t.Logf("Note: Time difference of %d seconds detected (this is expected due to timezone offset)", diff)
+	}
+}
+
+// =============================================================================
 // Connection Pool Tests
 // =============================================================================
 

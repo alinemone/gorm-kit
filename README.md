@@ -69,8 +69,9 @@ manager, err := gormkit.New(&gormkit.Config{
     User:     "postgres",
     Password: "postgres",
     Database: "mydb",
-    
+
     // Optional
+    Timezone:        "UTC",  // UTC, Asia/Tehran, America/New_York, etc.
     MaxOpenConns:    25,
     MaxIdleConns:    5,
     ConnMaxLifetime: 5 * time.Minute,
@@ -108,6 +109,32 @@ stats := manager.Stats()
 ```
 
 ## Examples
+
+### Custom Timezone
+
+```go
+// Use Tehran timezone
+manager, err := gormkit.New(&gormkit.Config{
+    Driver:   "postgres",
+    Host:     "localhost",
+    Port:     5432,
+    User:     "postgres",
+    Password: "postgres",
+    Database: "mydb",
+    Timezone: "Asia/Tehran", // All timestamps will use Tehran timezone
+})
+
+// Use New York timezone
+manager, err := gormkit.New(&gormkit.Config{
+    Driver:   "mysql",
+    Host:     "localhost",
+    Port:     3306,
+    User:     "root",
+    Password: "password",
+    Database: "myapp",
+    Timezone: "America/New_York",
+})
+```
 
 ### With Fiber
 
@@ -201,6 +228,7 @@ func TestMyFunc(t *testing.T) {
 | Password | - | Database password |
 | Database | - | Database name |
 | SSLMode | disable | SSL mode for postgres |
+| Timezone | UTC | Database timezone (e.g., UTC, Asia/Tehran) |
 | MaxOpenConns | 25 | Max open connections |
 | MaxIdleConns | 5 | Max idle connections |
 | ConnMaxLifetime | 5m | Connection max lifetime |

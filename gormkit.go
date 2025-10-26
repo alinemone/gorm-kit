@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"net/url"
 	"time"
 
 	sqlite "github.com/glebarez/sqlite"
@@ -22,6 +23,7 @@ type Config struct {
 	Password string
 	Database string
 	SSLMode  string
+	Timezone string // e.g., "UTC", "Asia/Tehran", "America/New_York"
 
 	MaxOpenConns    int
 	MaxIdleConns    int
@@ -63,6 +65,9 @@ func New(cfg *Config) (*Manager, error) {
 	if cfg.ConnectTimeout == 0 {
 		cfg.ConnectTimeout = 10 * time.Second
 	}
+	if cfg.Timezone == "" {
+		cfg.Timezone = "Asia/Tehran"
+	}
 
 	m := &Manager{config: cfg}
 
@@ -78,14 +83,15 @@ func (m *Manager) connect() error {
 
 	switch m.config.Driver {
 	case "postgres":
-		dsn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
+		dsn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=%s TimeZone=%s",
 			m.config.Host, m.config.Port, m.config.User, m.config.Password,
-			m.config.Database, m.config.SSLMode)
+			m.config.Database, m.config.SSLMode, m.config.Timezone)
 		dialector = postgres.Open(dsn)
 
 	case "mysql":
-		dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=utf8mb4&parseTime=True&loc=Local",
-			m.config.User, m.config.Password, m.config.Host, m.config.Port, m.config.Database)
+		dsn := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=utf8mb4&parseTime=True&loc=%s",
+			m.config.User, m.config.Password, m.config.Host, m.config.Port, m.config.Database,
+			url.QueryEscape(m.config.Timezone))
 		dialector = mysql.Open(dsn)
 
 	case "sqlite", "test":
@@ -105,14 +111,19 @@ func (m *Manager) connect() error {
 		logLevel = logger.Error
 	}
 
+	// Load timezone location
+	loc, err := time.LoadLocation(m.config.Timezone)
+	if err != nil {
+		return fmt.Errorf("invalid timezone %s: %w", m.config.Timezone, err)
+	}
+
 	gormConfig := &gorm.Config{
 		Logger: logger.Default.LogMode(logLevel),
 		NowFunc: func() time.Time {
-			return time.Now().UTC()
+			return time.Now().In(loc)
 		},
 	}
 
-	var err error
 	for i := 0; i < m.config.RetryAttempts; i++ {
 		m.db, err = gorm.Open(dialector, gormConfig)
 		if err == nil {
